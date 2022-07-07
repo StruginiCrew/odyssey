@@ -1,0 +1,12 @@
+{
+  "uid": "open_exam_quiz",
+  "version": 1,
+  "events": [
+    { "event": "selectAnswers", "questionId": 1, "answerIds": [1, 2] },
+    { "event": "selectAnswers", "questionId": 2, "answerIds": [3, 4] },
+    { "event": "clearAnswers", "questionId": 2 },
+    { "event": "selectAnswers", "questionId": 2, "answerIds": [2, 3] },
+    { "event": "inputAnswers", "questionId": 3, "inputs": ["Cow"] },
+    { "event": "inputAnswers", "questionId": 4, "inputs": ["a horse", "Pig", "Handsome Cow", "A Lizard"] }
+  ]
+}
