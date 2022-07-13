@@ -3,16 +3,30 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Getters)]
 #[serde(rename_all = "camelCase")]
-struct EventLog {
+pub struct EventLog {
     uid: String,
     version: usize,
     events: Vec<Event>,
 }
 
+impl EventLog {
+    pub fn new(uid: String, version: usize, events: Vec<Event>) -> Self {
+        Self {
+            uid,
+            version,
+            events,
+        }
+    }
+
+    pub fn push(&mut self, event: Event) {
+        self.events.push(event);
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "event")]
 #[serde(rename_all = "camelCase")]
-enum Event {
+pub enum Event {
     #[serde(rename_all = "camelCase")]
     SelectAnswers {
         question_id: usize,

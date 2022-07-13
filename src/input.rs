@@ -20,7 +20,6 @@ pub struct AnswerInput {
 pub enum QuestionMode {
     Select,
     Input,
-    Mixed,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -31,11 +30,6 @@ pub enum EntryMatch {
     Id { id: Vec<usize> },
     #[serde(rename_all = "camelCase")]
     Content { content: Vec<String> },
-    #[serde(rename_all = "camelCase")]
-    IdOrContent {
-        id: Vec<usize>,
-        content: Vec<String>,
-    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Getters)]
