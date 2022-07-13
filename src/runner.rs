@@ -57,6 +57,15 @@ impl Runner {
         Ok(Self { state, event_log })
     }
 
+    pub fn new_with_events(input: String, event_log_input: String) -> RunnerResult<Self> {
+        let input: QuizInput = serde_json::from_str(&input)?;
+        let store = QuizStore::try_from(&input)?;
+        let event_log = serde_json::from_str::<EventLog>(&event_log_input)?;
+        let state = QuizState::new(store);
+
+        Ok(Self { state, event_log })
+    }
+
     pub fn select_answers(
         &mut self,
         question_id: usize,
