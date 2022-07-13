@@ -1,6 +1,6 @@
 use crate::event_log::{Event, EventLog};
 use crate::input::{EntryMatch, QuizMode};
-use crate::store::{QuestionStore, QuizStore};
+use crate::store::{QuestionStore, QuizStore, SectionStore};
 use derive_getters::Getters;
 use std::collections::HashMap;
 
@@ -197,39 +197,24 @@ impl QuestionState {
 #[derive(Debug, Getters)]
 pub struct QuizState {
     store: QuizStore,
-    event_log: EventLog,
     question_state: HashMap<usize, QuestionState>,
 }
 
 impl QuizState {
     pub fn new(store: QuizStore) -> Self {
-        let event_log = EventLog::new(store.uid().clone(), store.version().clone(), Vec::new());
-
         Self {
             store,
-            event_log,
             question_state: HashMap::new(),
         }
     }
 
-    pub fn event(&mut self, event: Event) -> StateResult<()> {
-        match &event {
-            Event::SelectAnswers {
-                question_id,
-                answer_ids,
-            } => self.handle_select_answers(*question_id, answer_ids.clone())?,
-            Event::InputAnswers {
-                question_id,
-                inputs,
-            } => self.handle_input_answers(*question_id, inputs.clone())?,
-            Event::ClearAnswers { question_id } => self.handle_clear_answers(*question_id)?,
-        }
-
-        self.event_log.push(event);
-        Ok(())
+    pub fn find_section(&self, section_id: usize) -> StateResult<&SectionStore> {
+        self.store.sections().get(&section_id).ok_or(StateError {
+            error: StateErrorEnum::SectionNotFound { section_id },
+        })
     }
 
-    fn find_question(&self, question_id: usize) -> StateResult<&QuestionStore> {
+    pub fn find_question(&self, question_id: usize) -> StateResult<&QuestionStore> {
         let question = self.store.questions().get(&question_id).ok_or(StateError {
             error: StateErrorEnum::QuestionNotFound { question_id },
         })?;
@@ -273,29 +258,25 @@ impl QuizState {
         }
     }
 
-    fn handle_select_answers(
+    pub fn select_answers(
         &mut self,
         question_id: usize,
         answer_ids: Vec<usize>,
     ) -> StateResult<()> {
         let question = self.find_question(question_id)?;
-        self.question_state.insert(
-            question_id,
-            QuestionState::new_with_selections(&question, answer_ids)?,
-        );
+        let question_state = QuestionState::new_with_selections(&question, answer_ids)?;
+        self.question_state.insert(question_id, question_state);
         Ok(())
     }
 
-    fn handle_input_answers(&mut self, question_id: usize, inputs: Vec<String>) -> StateResult<()> {
+    pub fn input_answers(&mut self, question_id: usize, inputs: Vec<String>) -> StateResult<()> {
         let question = self.find_question(question_id)?;
-        self.question_state.insert(
-            question_id,
-            QuestionState::new_with_inputs(&question, inputs)?,
-        );
+        let question_state = QuestionState::new_with_inputs(&question, inputs)?;
+        self.question_state.insert(question_id, question_state);
         Ok(())
     }
 
-    fn handle_clear_answers(&mut self, question_id: usize) -> StateResult<()> {
+    pub fn clear_answers(&mut self, question_id: usize) -> StateResult<()> {
         let question = self.find_question(question_id)?;
         self.question_state.remove(&question_id);
         Ok(())

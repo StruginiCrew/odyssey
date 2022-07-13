@@ -1,6 +1,6 @@
-use crate::input::QuestionMode;
-use crate::state::{AnswerState, AnswerStateStatus, QuestionState, QuestionStateStatus, QuizState};
-use crate::store::{AnswerStore, QuestionStore, SectionStore};
+use crate::input::{QuestionMode, QuizMode};
+use crate::state::{AnswerStateStatus, QuestionState, QuestionStateStatus, QuizState};
+use crate::store::{QuestionStore, QuizStore, SectionStore};
 use derive_getters::Getters;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -155,6 +155,38 @@ impl SectionView {
                         question_store,
                         quiz_state.question_state().get(id),
                     )),
+                    None => None,
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Getters)]
+#[serde(rename_all = "camelCase")]
+pub struct QuizView {
+    uid: String,
+    version: usize,
+    title: Option<String>,
+    description: Option<String>,
+    quiz_mode: QuizMode,
+    sections: Vec<SectionView>,
+}
+
+impl QuizView {
+    pub fn new(quiz_state: &QuizState) -> Self {
+        let quiz_store = quiz_state.store();
+        QuizView {
+            uid: quiz_store.uid().clone(),
+            version: quiz_store.version().clone(),
+            title: quiz_store.title().clone(),
+            description: quiz_store.description().clone(),
+            quiz_mode: quiz_store.quiz_mode().clone(),
+            sections: quiz_store
+                .section_ids()
+                .iter()
+                .filter_map(|id| match quiz_state.store().sections().get(id) {
+                    Some(section_store) => Some(SectionView::new(section_store, quiz_state)),
                     None => None,
                 })
                 .collect(),
