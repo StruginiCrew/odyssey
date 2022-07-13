@@ -48,7 +48,7 @@ pub struct Runner {
 }
 
 impl Runner {
-    pub fn new(input: String) -> RunnerResult<Self> {
+    pub fn new(input: &str) -> RunnerResult<Self> {
         let input: QuizInput = serde_json::from_str(&input)?;
         let store = QuizStore::try_from(&input)?;
         let event_log = EventLog::new(store.uid().clone(), store.version().clone(), Vec::new());
@@ -57,7 +57,7 @@ impl Runner {
         Ok(Self { state, event_log })
     }
 
-    pub fn new_with_events(input: String, event_log_input: String) -> RunnerResult<Self> {
+    pub fn new_with_events(input: &str, event_log_input: &str) -> RunnerResult<Self> {
         let input: QuizInput = serde_json::from_str(&input)?;
         let store = QuizStore::try_from(&input)?;
         let event_log = serde_json::from_str::<EventLog>(&event_log_input)?;
@@ -76,7 +76,7 @@ impl Runner {
             answer_ids,
         })?;
 
-        self.question(question_id)
+        self.question_view(question_id)
     }
 
     pub fn input_answers(
@@ -89,16 +89,16 @@ impl Runner {
             inputs,
         })?;
 
-        self.question(question_id)
+        self.question_view(question_id)
     }
 
     pub fn clear_answers(&mut self, question_id: usize) -> RunnerResult<QuestionView> {
         self.event(Event::ClearAnswers { question_id })?;
 
-        self.question(question_id)
+        self.question_view(question_id)
     }
 
-    pub fn question(&mut self, question_id: usize) -> RunnerResult<QuestionView> {
+    pub fn question_view(&mut self, question_id: usize) -> RunnerResult<QuestionView> {
         let question_store = self.state.find_question(question_id)?;
 
         let view = QuestionView::new(
@@ -109,7 +109,7 @@ impl Runner {
         Ok(view)
     }
 
-    pub fn section(&mut self, section_id: usize) -> RunnerResult<SectionView> {
+    pub fn section_view(&mut self, section_id: usize) -> RunnerResult<SectionView> {
         let section_store = self.state.find_section(section_id)?;
 
         let view = SectionView::new(&section_store, &self.state);
@@ -117,7 +117,7 @@ impl Runner {
         Ok(view)
     }
 
-    pub fn quiz(&mut self) -> RunnerResult<QuizView> {
+    pub fn quiz_view(&mut self) -> RunnerResult<QuizView> {
         let view = QuizView::new(&self.state);
 
         Ok(view)
