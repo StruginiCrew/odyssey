@@ -3,15 +3,17 @@ use crate::input::QuizInput;
 use crate::state::{QuizState, StateError};
 use crate::store::{QuizStore, StoreError};
 use crate::view::{QuestionView, QuizView, SectionView};
+use crate::view_cache::ViewCache;
 use serde_json::Error as JsonError;
-use std::collections::HashMap;
 
 type RunnerResult<T> = Result<T, RunnerError>;
 
+#[derive(Debug)]
 pub struct RunnerError {
     error: RunnerErrorEnum,
 }
 
+#[derive(Debug)]
 enum RunnerErrorEnum {
     InputError { source: JsonError },
     StoreError { source: StoreError },
@@ -45,6 +47,7 @@ impl From<StateError> for RunnerError {
 pub struct Runner {
     state: QuizState,
     event_log: EventLog,
+    view_cache: ViewCache,
 }
 
 impl Runner {
@@ -54,7 +57,11 @@ impl Runner {
         let event_log = EventLog::new(store.uid().clone(), store.version().clone(), Vec::new());
         let state = QuizState::new(store);
 
-        Ok(Self { state, event_log })
+        Ok(Self {
+            state,
+            event_log,
+            view_cache: ViewCache::new(),
+        })
     }
 
     pub fn new_with_events(input: &str, event_log_input: &str) -> RunnerResult<Self> {
@@ -63,7 +70,21 @@ impl Runner {
         let event_log = serde_json::from_str::<EventLog>(&event_log_input)?;
         let state = QuizState::new(store);
 
-        Ok(Self { state, event_log })
+        let mut runner = Self {
+            state,
+            event_log: EventLog::new(
+                event_log.uid().clone(),
+                event_log.version().clone(),
+                Vec::new(),
+            ),
+            view_cache: ViewCache::new(),
+        };
+
+        for event in event_log.extract_events() {
+            runner.event(event)?;
+        }
+
+        Ok(runner)
     }
 
     pub fn select_answers(
@@ -101,10 +122,19 @@ impl Runner {
     pub fn question_view(&mut self, question_id: usize) -> RunnerResult<QuestionView> {
         let question_store = self.state.find_question(question_id)?;
 
-        let view = QuestionView::new(
-            &question_store,
-            self.state.question_state().get(&question_id),
-        );
+        let view = match self
+            .view_cache
+            .question(self.event_log.generation(), question_id)
+        {
+            Some(view) => view,
+            None => self.view_cache.cache_question(
+                self.event_log.generation(),
+                QuestionView::new(
+                    &question_store,
+                    self.state.question_state().get(&question_id),
+                ),
+            ),
+        };
 
         Ok(view)
     }
@@ -112,15 +142,27 @@ impl Runner {
     pub fn section_view(&mut self, section_id: usize) -> RunnerResult<SectionView> {
         let section_store = self.state.find_section(section_id)?;
 
-        let view = SectionView::new(&section_store, &self.state);
+        let view = match self
+            .view_cache
+            .section(self.event_log.generation(), section_id)
+        {
+            Some(view) => view,
+            None => self.view_cache.cache_section(
+                self.event_log.generation(),
+                SectionView::new(&section_store, &self.state),
+            ),
+        };
 
         Ok(view)
     }
 
-    pub fn quiz_view(&mut self) -> RunnerResult<QuizView> {
-        let view = QuizView::new(&self.state);
-
-        Ok(view)
+    pub fn quiz_view(&mut self) -> QuizView {
+        match self.view_cache.quiz(self.event_log.generation()) {
+            Some(view) => view,
+            None => self
+                .view_cache
+                .cache_quiz(self.event_log.generation(), QuizView::new(&self.state)),
+        }
     }
 
     pub fn event_log(&self) -> &EventLog {

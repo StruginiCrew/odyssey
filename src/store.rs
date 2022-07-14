@@ -1,15 +1,19 @@
 use crate::input::{
-    AnswerInput, EntryMatch, QuestionInput, QuestionMode, QuizInput, QuizMode, SectionInput,
+    AnswerInput, EntryMatch, QuestionInput, QuestionMode, QuestionStatusInput, QuizInput, QuizMode,
+    SectionInput,
 };
 use derive_getters::Getters;
+use regex::Regex;
 use std::collections::HashMap;
 
 type StoreResult<T> = Result<T, StoreError>;
 
+#[derive(Debug)]
 pub struct StoreError {
     error: StoreErrorEnum,
 }
 
+#[derive(Debug)]
 enum StoreErrorEnum {
     DuplicateSectionId {
         section_id: usize,
@@ -22,12 +26,29 @@ enum StoreErrorEnum {
         question_id: usize,
         answer_id: usize,
     },
+    RegexError {
+        source: regex::Error,
+    },
+}
+
+impl From<regex::Error> for StoreError {
+    fn from(item: regex::Error) -> Self {
+        Self {
+            error: StoreErrorEnum::RegexError { source: item },
+        }
+    }
 }
 
 #[derive(Debug, Getters)]
 pub struct AnswerStore {
     id: usize,
     content: String,
+}
+
+#[derive(Debug)]
+pub enum CompiledEntryMatch {
+    Id { id: Vec<usize> },
+    Content { content: Vec<Regex> },
 }
 
 #[derive(Debug, Getters)]
@@ -40,7 +61,7 @@ pub struct QuestionStore {
     max_entries: Option<usize>,
     min_correct_entries: Option<usize>,
     max_wrong_entries: Option<usize>,
-    correct_entry_match: Option<EntryMatch>,
+    correct_entry_match: Option<CompiledEntryMatch>,
     answer_ids: Vec<usize>,
     answers: HashMap<usize, AnswerStore>,
 }
@@ -60,6 +81,7 @@ pub struct QuizStore {
     title: Option<String>,
     description: Option<String>,
     quiz_mode: QuizMode,
+    block_answer_updates_for: Option<Vec<QuestionStatusInput>>,
     section_ids: Vec<usize>,
     sections: HashMap<usize, SectionStore>,
     question_ids: Vec<usize>,
@@ -87,6 +109,24 @@ impl From<&AnswerInput> for AnswerStore {
             id: *answer.id(),
             content: answer.content().clone(),
         }
+    }
+}
+
+impl TryFrom<&EntryMatch> for CompiledEntryMatch {
+    type Error = StoreError;
+
+    fn try_from(entry_match: &EntryMatch) -> StoreResult<Self> {
+        let compiled_entry_match = match entry_match {
+            EntryMatch::Id { id } => CompiledEntryMatch::Id { id: id.clone() },
+            EntryMatch::Content { content } => CompiledEntryMatch::Content {
+                content: content
+                    .iter()
+                    .map(|m| Regex::new(&format!("(?i){}", m)))
+                    .collect::<Result<Vec<Regex>, regex::Error>>()?,
+            },
+        };
+
+        Ok(compiled_entry_match)
     }
 }
 
@@ -125,7 +165,10 @@ impl TryFrom<&QuestionInput> for QuestionStore {
             max_entries: *question.max_entries(),
             min_correct_entries: *question.min_correct_entries(),
             max_wrong_entries: *question.max_wrong_entries(),
-            correct_entry_match: question.correct_entry_match().clone(),
+            correct_entry_match: match question.correct_entry_match() {
+                Some(correct_entry_match) => Some(correct_entry_match.try_into()?),
+                None => None,
+            },
             answer_ids,
             answers,
         })
@@ -174,6 +217,7 @@ impl TryFrom<&QuizInput> for QuizStore {
             title: quiz.title().clone(),
             description: quiz.description().clone(),
             quiz_mode: quiz.mode().clone(),
+            block_answer_updates_for: quiz.block_answer_updates_for().clone(),
             section_ids,
             sections,
             question_ids,

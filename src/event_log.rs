@@ -18,12 +18,20 @@ impl EventLog {
         }
     }
 
+    pub fn generation(&self) -> usize {
+        self.events.len()
+    }
+
     pub fn push(&mut self, event: Event) {
         self.events.push(event);
     }
+
+    pub fn extract_events(self) -> Vec<Event> {
+        self.events
+    }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "event")]
 #[serde(rename_all = "camelCase")]
 pub enum Event {

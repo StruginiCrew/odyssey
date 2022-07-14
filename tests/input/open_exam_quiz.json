@@ -4,6 +4,7 @@
   "title": "Animals exam",
   "description": "How well do you know animals?",
   "mode": "open",
+  "blockAnswerUpdatesFor": ["answeredCorrectly"],
   "sections": [
     {
       "id": 1,
@@ -48,24 +49,25 @@
           "id": 3,
           "content": "Which farm animal gives us milk?",
           "mode": "input",
-          "minEntries": 1,
-          "maxEntries": 1,
-          "minCorrectEntries": 1,
-          "correctEntryMatch": { "content": ["cow"] }
+          "minEntries": 2,
+          "maxEntries": 2,
+          "minCorrectEntries": 2,
+          "correctEntryMatch": { "content": ["cow", "goat"] }
         },
         {
           "id": 4,
           "content": "Name at least 3 farm animals",
           "mode": "select",
           "minEntries": 3,
-          "minCorrectEntries": 3,
+          "minCorrectEntries": 2,
           "maxWrongEntries": 1,
-          "correctEntryMatch": { "content": ["cow", "pig"] },
+          "correctEntryMatch": { "content": ["cow", "pig", "horse"] },
           "answers": [
             { "id": 1, "content": "Cow" },
             { "id": 2, "content": "Lizard" },
             { "id": 3, "content": "Pig" },
-            { "id": 4, "content": "Giraffe" }
+            { "id": 4, "content": "Giraffe" },
+            { "id": 5, "content": "Horse" }
           ]
         }
       ]

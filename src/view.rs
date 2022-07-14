@@ -5,7 +5,7 @@ use derive_getters::Getters;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum AnswerViewStatus {
     Pending,
@@ -24,7 +24,7 @@ impl From<&AnswerStateStatus> for AnswerViewStatus {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum QuestionViewStatus {
     Pending,
@@ -45,7 +45,7 @@ impl From<&QuestionStateStatus> for QuestionViewStatus {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Getters)]
+#[derive(Serialize, Deserialize, Debug, Getters, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AnswerView {
     id: Option<usize>,
@@ -53,7 +53,7 @@ pub struct AnswerView {
     status: AnswerViewStatus,
 }
 
-#[derive(Serialize, Deserialize, Debug, Getters)]
+#[derive(Serialize, Deserialize, Debug, Getters, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct QuestionView {
     id: usize,
@@ -132,7 +132,7 @@ impl QuestionView {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Getters)]
+#[derive(Serialize, Deserialize, Debug, Getters, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SectionView {
     id: usize,
@@ -162,7 +162,7 @@ impl SectionView {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Getters)]
+#[derive(Serialize, Deserialize, Debug, Getters, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct QuizView {
     uid: String,

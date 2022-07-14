@@ -8,6 +8,15 @@ pub enum QuizMode {
     Linear,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum QuestionStatusInput {
+    InProgress,
+    Answered,
+    AnsweredCorrectly,
+    AnsweredWrongly,
+}
+
 #[derive(Serialize, Deserialize, Debug, Getters)]
 #[serde(rename_all = "camelCase")]
 pub struct AnswerInput {
@@ -64,6 +73,7 @@ pub struct QuizInput {
     title: Option<String>,
     description: Option<String>,
     mode: QuizMode,
+    block_answer_updates_for: Option<Vec<QuestionStatusInput>>,
     sections: Vec<SectionInput>,
 }
 

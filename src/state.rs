@@ -1,15 +1,16 @@
-use crate::event_log::{Event, EventLog};
-use crate::input::{EntryMatch, QuizMode};
-use crate::store::{QuestionStore, QuizStore, SectionStore};
+use crate::input::{QuestionStatusInput, QuizMode};
+use crate::store::{CompiledEntryMatch, QuestionStore, QuizStore, SectionStore};
 use derive_getters::Getters;
 use std::collections::HashMap;
 
 type StateResult<T> = Result<T, StateError>;
 
+#[derive(Debug)]
 pub struct StateError {
     error: StateErrorEnum,
 }
 
+#[derive(Debug)]
 enum StateErrorEnum {
     SectionNotFound {
         section_id: usize,
@@ -27,13 +28,16 @@ enum StateErrorEnum {
     QuestionHasNoSelectableAnswers {
         question_id: usize,
     },
+    QuestionCanNotBeUpdated {
+        question_id: usize,
+    },
     AnswerSelectionMismatch {
         question_id: usize,
         answer_ids: Vec<usize>,
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum AnswerStateStatus {
     Answered,
     AnsweredCorrectly,
@@ -58,17 +62,20 @@ impl AnswerState {
 
         let status = match question_store.correct_entry_match() {
             Some(entry_match) => match entry_match {
-                EntryMatch::Id { id: match_ids } => {
+                CompiledEntryMatch::Id { id: match_ids } => {
                     if match_ids.contains(&answer_id) {
                         AnswerStateStatus::AnsweredCorrectly
                     } else {
                         AnswerStateStatus::AnsweredWrongly
                     }
                 }
-                EntryMatch::Content {
+                CompiledEntryMatch::Content {
                     content: match_contents,
                 } => {
-                    if match_contents.contains(answer.content()) {
+                    if match_contents
+                        .iter()
+                        .any(|match_content| match_content.is_match(answer.content()))
+                    {
                         AnswerStateStatus::AnsweredCorrectly
                     } else {
                         AnswerStateStatus::AnsweredWrongly
@@ -88,11 +95,14 @@ impl AnswerState {
     fn new_input(question_store: &QuestionStore, content: String) -> StateResult<Self> {
         let status = match question_store.correct_entry_match() {
             Some(entry_match) => match entry_match {
-                EntryMatch::Id { id: _ } => AnswerStateStatus::Answered,
-                EntryMatch::Content {
+                CompiledEntryMatch::Id { id: _ } => AnswerStateStatus::Answered,
+                CompiledEntryMatch::Content {
                     content: match_contents,
                 } => {
-                    if match_contents.contains(&content) {
+                    if match_contents
+                        .iter()
+                        .any(|match_content| match_content.is_match(&content))
+                    {
                         AnswerStateStatus::AnsweredCorrectly
                     } else {
                         AnswerStateStatus::AnsweredWrongly
@@ -110,12 +120,23 @@ impl AnswerState {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum QuestionStateStatus {
     InProgress,
     Answered,
     AnsweredCorrectly,
     AnsweredWrongly,
+}
+
+impl From<&QuestionStatusInput> for QuestionStateStatus {
+    fn from(item: &QuestionStatusInput) -> Self {
+        match item {
+            QuestionStatusInput::InProgress => Self::InProgress,
+            QuestionStatusInput::Answered => Self::Answered,
+            QuestionStatusInput::AnsweredCorrectly => Self::AnsweredCorrectly,
+            QuestionStatusInput::AnsweredWrongly => Self::AnsweredWrongly,
+        }
+    }
 }
 
 #[derive(Debug, Getters)]
@@ -214,6 +235,28 @@ impl QuizState {
         })
     }
 
+    fn find_question_for_update(&self, question_id: usize) -> StateResult<&QuestionStore> {
+        let question = self.find_question(question_id)?;
+
+        match self.question_state.get(&question_id) {
+            Some(question_state) => match self.store.block_answer_updates_for() {
+                Some(blocked_statuses) => {
+                    if blocked_statuses.iter().any(|blocked_status| {
+                        question_state.status() == &QuestionStateStatus::from(blocked_status)
+                    }) {
+                        Err(StateError {
+                            error: StateErrorEnum::QuestionCanNotBeUpdated { question_id },
+                        })
+                    } else {
+                        Ok(question)
+                    }
+                }
+                None => Ok(question),
+            },
+            None => Ok(question),
+        }
+    }
+
     pub fn find_question(&self, question_id: usize) -> StateResult<&QuestionStore> {
         let question = self.store.questions().get(&question_id).ok_or(StateError {
             error: StateErrorEnum::QuestionNotFound { question_id },
@@ -263,21 +306,21 @@ impl QuizState {
         question_id: usize,
         answer_ids: Vec<usize>,
     ) -> StateResult<()> {
-        let question = self.find_question(question_id)?;
+        let question = self.find_question_for_update(question_id)?;
         let question_state = QuestionState::new_with_selections(&question, answer_ids)?;
         self.question_state.insert(question_id, question_state);
         Ok(())
     }
 
     pub fn input_answers(&mut self, question_id: usize, inputs: Vec<String>) -> StateResult<()> {
-        let question = self.find_question(question_id)?;
+        let question = self.find_question_for_update(question_id)?;
         let question_state = QuestionState::new_with_inputs(&question, inputs)?;
         self.question_state.insert(question_id, question_state);
         Ok(())
     }
 
     pub fn clear_answers(&mut self, question_id: usize) -> StateResult<()> {
-        let question = self.find_question(question_id)?;
+        let question = self.find_question_for_update(question_id)?;
         self.question_state.remove(&question_id);
         Ok(())
     }
