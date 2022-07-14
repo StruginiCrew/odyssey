@@ -35,6 +35,7 @@ enum StateErrorEnum {
         question_id: usize,
         answer_ids: Vec<usize>,
     },
+    QuizFinished,
 }
 
 #[derive(Debug, PartialEq)]
@@ -215,6 +216,13 @@ impl QuestionState {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum QuizStateStatus {
+    InProgress,
+    Completed,
+    Failed,
+}
+
 #[derive(Debug, Getters)]
 pub struct QuizState {
     store: QuizStore,
@@ -236,6 +244,12 @@ impl QuizState {
     }
 
     fn find_question_for_update(&self, question_id: usize) -> StateResult<&QuestionStore> {
+        if self.quiz_status() != QuizStateStatus::InProgress {
+            return Err(StateError {
+                error: StateErrorEnum::QuizFinished,
+            });
+        }
+
         let question = self.find_question(question_id)?;
 
         match self.question_state.get(&question_id) {
@@ -298,6 +312,91 @@ impl QuizState {
                     None => Ok(question),
                 }
             }
+        }
+    }
+
+    pub fn answered_questions_count(&self) -> usize {
+        self.question_state
+            .values()
+            .filter(|q| match q.status() {
+                QuestionStateStatus::InProgress => false,
+                _ => true,
+            })
+            .count()
+    }
+
+    pub fn correct_questions_count(&self) -> usize {
+        self.question_state
+            .values()
+            .filter(|q| match q.status() {
+                QuestionStateStatus::AnsweredCorrectly => true,
+                _ => false,
+            })
+            .count()
+    }
+
+    pub fn wrong_questions_count(&self) -> usize {
+        self.question_state
+            .values()
+            .filter(|q| match q.status() {
+                QuestionStateStatus::AnsweredWrongly => true,
+                _ => false,
+            })
+            .count()
+    }
+
+    pub fn quiz_status(&self) -> QuizStateStatus {
+        if self
+            .store
+            .questions()
+            .values()
+            .filter_map(|question_store| {
+                if *question_store.optional() {
+                    None
+                } else {
+                    Some(question_store.id().clone())
+                }
+            })
+            .any(|question_id| match self.question_state.get(&question_id) {
+                Some(question_state)
+                    if question_state.status() == &QuestionStateStatus::InProgress
+                        || question_state.status() == &QuestionStateStatus::AnsweredWrongly =>
+                {
+                    true
+                }
+                _ => false,
+            })
+        {
+            return QuizStateStatus::InProgress;
+        }
+
+        match (
+            self.store.min_answered_questions(),
+            self.store.max_answered_questions(),
+            self.store.min_correct_questions(),
+            self.store.max_wrong_questions(),
+        ) {
+            (Some(min_answered_questions), _, _, _)
+                if self.answered_questions_count() < *min_answered_questions =>
+            {
+                QuizStateStatus::InProgress
+            }
+            (_, _, _, Some(max_wrong_questions))
+                if self.wrong_questions_count() >= *max_wrong_questions =>
+            {
+                QuizStateStatus::Failed
+            }
+            (_, _, Some(min_correct_questions), _)
+                if self.correct_questions_count() >= *min_correct_questions =>
+            {
+                QuizStateStatus::Completed
+            }
+            (_, Some(max_answered_questions), _, _)
+                if self.answered_questions_count() >= *max_answered_questions =>
+            {
+                QuizStateStatus::Completed
+            }
+            _ => QuizStateStatus::Completed,
         }
     }
 

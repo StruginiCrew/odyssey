@@ -1,6 +1,8 @@
 use crate::input::{QuestionMode, QuizMode};
-use crate::state::{AnswerStateStatus, QuestionState, QuestionStateStatus, QuizState};
-use crate::store::{QuestionStore, QuizStore, SectionStore};
+use crate::state::{
+    AnswerStateStatus, QuestionState, QuestionStateStatus, QuizState, QuizStateStatus,
+};
+use crate::store::{QuestionStore, SectionStore};
 use derive_getters::Getters;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -162,6 +164,24 @@ impl SectionView {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum QuizViewStatus {
+    InProgress,
+    Completed,
+    Failed,
+}
+
+impl From<QuizStateStatus> for QuizViewStatus {
+    fn from(item: QuizStateStatus) -> Self {
+        match item {
+            QuizStateStatus::InProgress => Self::InProgress,
+            QuizStateStatus::Completed => Self::Completed,
+            QuizStateStatus::Failed => Self::Failed,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Getters, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct QuizView {
@@ -170,18 +190,27 @@ pub struct QuizView {
     title: Option<String>,
     description: Option<String>,
     quiz_mode: QuizMode,
+    status: QuizViewStatus,
+    answered_questions_count: usize,
+    correct_questions_count: usize,
+    wrong_questions_count: usize,
     sections: Vec<SectionView>,
 }
 
 impl QuizView {
     pub fn new(quiz_state: &QuizState) -> Self {
         let quiz_store = quiz_state.store();
+
         QuizView {
             uid: quiz_store.uid().clone(),
             version: quiz_store.version().clone(),
             title: quiz_store.title().clone(),
             description: quiz_store.description().clone(),
             quiz_mode: quiz_store.quiz_mode().clone(),
+            status: quiz_state.quiz_status().into(),
+            answered_questions_count: quiz_state.answered_questions_count(),
+            correct_questions_count: quiz_state.correct_questions_count(),
+            wrong_questions_count: quiz_state.wrong_questions_count(),
             sections: quiz_store
                 .section_ids()
                 .iter()

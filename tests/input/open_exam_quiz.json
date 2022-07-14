@@ -4,6 +4,9 @@
   "title": "Animals exam",
   "description": "How well do you know animals?",
   "mode": "open",
+  "minAnsweredQuestions": 4,
+  "minCorrectQuestions": 4,
+  "maxWrongQuestions": 1,
   "blockAnswerUpdatesFor": ["answeredCorrectly"],
   "sections": [
     {
@@ -47,6 +50,7 @@
       "questions": [
         {
           "id": 3,
+          "required": true,
           "content": "Which farm animal gives us milk?",
           "mode": "input",
           "minEntries": 2,

@@ -48,6 +48,8 @@ pub struct QuestionInput {
     title: Option<String>,
     content: String,
     mode: QuestionMode,
+    #[serde(default)]
+    optional: bool,
     min_entries: Option<usize>,
     max_entries: Option<usize>,
     min_correct_entries: Option<usize>,
@@ -74,6 +76,10 @@ pub struct QuizInput {
     description: Option<String>,
     mode: QuizMode,
     block_answer_updates_for: Option<Vec<QuestionStatusInput>>,
+    min_answered_questions: Option<usize>,
+    max_answered_questions: Option<usize>,
+    min_correct_questions: Option<usize>,
+    max_wrong_questions: Option<usize>,
     sections: Vec<SectionInput>,
 }
 
