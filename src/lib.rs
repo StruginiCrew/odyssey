@@ -6,5 +6,6 @@ mod store;
 mod view;
 mod view_cache;
 
-pub use runner::Runner;
 pub use input::QuizMode;
+pub use runner::Runner;
+pub use view::{AnswerViewStatus, QuestionViewStatus};

@@ -1,7 +1,7 @@
 use crate::input::{QuestionStatusInput, QuizMode};
 use crate::store::{CompiledEntryMatch, QuestionStore, QuizStore, SectionStore};
 use derive_getters::Getters;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 type StateResult<T> = Result<T, StateError>;
 
@@ -41,7 +41,7 @@ enum StateErrorEnum {
 #[derive(Debug, PartialEq)]
 pub enum AnswerStateStatus {
     Answered,
-    AnsweredCorrectly,
+    AnsweredCorrectly(usize),
     AnsweredWrongly,
 }
 
@@ -64,22 +64,20 @@ impl AnswerState {
         let status = match question_store.correct_entry_match() {
             Some(entry_match) => match entry_match {
                 CompiledEntryMatch::Id { id: match_ids } => {
-                    if match_ids.contains(&answer_id) {
-                        AnswerStateStatus::AnsweredCorrectly
-                    } else {
-                        AnswerStateStatus::AnsweredWrongly
+                    match match_ids.iter().position(|id| id == &answer_id) {
+                        Some(index) => AnswerStateStatus::AnsweredCorrectly(index),
+                        None => AnswerStateStatus::AnsweredWrongly,
                     }
                 }
                 CompiledEntryMatch::Content {
                     content: match_contents,
                 } => {
-                    if match_contents
+                    match match_contents
                         .iter()
-                        .any(|match_content| match_content.is_match(answer.content()))
+                        .position(|match_content| match_content.is_match(answer.content()))
                     {
-                        AnswerStateStatus::AnsweredCorrectly
-                    } else {
-                        AnswerStateStatus::AnsweredWrongly
+                        Some(index) => AnswerStateStatus::AnsweredCorrectly(index),
+                        None => AnswerStateStatus::AnsweredWrongly,
                     }
                 }
             },
@@ -100,13 +98,12 @@ impl AnswerState {
                 CompiledEntryMatch::Content {
                     content: match_contents,
                 } => {
-                    if match_contents
+                    match match_contents
                         .iter()
-                        .any(|match_content| match_content.is_match(&content))
+                        .position(|match_content| match_content.is_match(&content))
                     {
-                        AnswerStateStatus::AnsweredCorrectly
-                    } else {
-                        AnswerStateStatus::AnsweredWrongly
+                        Some(index) => AnswerStateStatus::AnsweredCorrectly(index),
+                        None => AnswerStateStatus::AnsweredWrongly,
                     }
                 }
             },
@@ -185,28 +182,37 @@ impl QuestionState {
         }
 
         let min_correct_entries = question_store.min_correct_entries().unwrap_or(0);
-        let max_wrong_entries = question_store.max_wrong_entries().unwrap_or(0);
+        let max_wrong_entries = question_store
+            .max_wrong_entries()
+            .unwrap_or(answer_states.len());
 
         let mut neutral_count = 0;
-        let mut correct_count = 0;
         let mut wrong_count = 0;
+
+        let mut used_answer_matches: HashSet<usize> = HashSet::new();
 
         for answer_state in &answer_states {
             match answer_state.status {
                 AnswerStateStatus::Answered => neutral_count += 1,
-                AnswerStateStatus::AnsweredCorrectly => correct_count += 1,
+                AnswerStateStatus::AnsweredCorrectly(index) => {
+                    used_answer_matches.insert(index);
+                }
                 AnswerStateStatus::AnsweredWrongly => wrong_count += 1,
             }
         }
 
-        let status = if correct_count >= 0 {
+        let correct_count = used_answer_matches.len();
+
+        let status = if correct_count > 0 {
             if correct_count >= min_correct_entries && wrong_count <= max_wrong_entries {
                 QuestionStateStatus::AnsweredCorrectly
             } else {
                 QuestionStateStatus::AnsweredWrongly
             }
-        } else {
+        } else if neutral_count > 0 {
             QuestionStateStatus::Answered
+        } else {
+            QuestionStateStatus::InProgress
         };
 
         Self {

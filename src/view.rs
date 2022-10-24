@@ -7,12 +7,12 @@ use derive_getters::Getters;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum AnswerViewStatus {
     Pending,
     Answered,
-    AnsweredCorrectly,
+    AnsweredCorrectly(usize),
     AnsweredWrongly,
 }
 
@@ -20,13 +20,15 @@ impl From<&AnswerStateStatus> for AnswerViewStatus {
     fn from(item: &AnswerStateStatus) -> Self {
         match item {
             AnswerStateStatus::Answered => AnswerViewStatus::Answered,
-            AnswerStateStatus::AnsweredCorrectly => AnswerViewStatus::AnsweredCorrectly,
+            AnswerStateStatus::AnsweredCorrectly(index) => {
+                AnswerViewStatus::AnsweredCorrectly(*index)
+            }
             AnswerStateStatus::AnsweredWrongly => AnswerViewStatus::AnsweredWrongly,
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum QuestionViewStatus {
     Pending,
@@ -47,7 +49,7 @@ impl From<&QuestionStateStatus> for QuestionViewStatus {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Getters, Clone)]
+#[derive(Serialize, Deserialize, Debug, Getters, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AnswerView {
     id: Option<usize>,
@@ -131,6 +133,16 @@ impl QuestionView {
                 },
             },
         }
+    }
+
+    pub fn correct_answer_match_indexes(&self) -> Vec<usize> {
+        self.answers
+            .iter()
+            .filter_map(|answer| match answer.status {
+                AnswerViewStatus::AnsweredCorrectly(index) => Some(index),
+                _ => None,
+            })
+            .collect()
     }
 }
 
